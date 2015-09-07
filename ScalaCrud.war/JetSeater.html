@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8"/>
+        <title>JetSeater</title>
+        <link rel="stylesheet" type="text/css" href="css/jquery-ui.min.css"/>
+        <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css"/>
+        <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
+        <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+        <script type="text/javascript" src="js/bootstrap.min.js"></script>
+        <script type="text/javascript" src="js/angular.min.js"></script>
+        <!-- <script type="text/javascript" src="js/d3.min.js"></script> -->
+        <!-- <script type="text/javascript" src="js/angular-charts.min.js"></script> -->
+    </head>
+
+    <body ng-app="JetSeater" ng-cloak>
+
+        <nav class="navbar navbar-default navbar-static-top" role="navigation" ng-controller="navController" ng-cloak>
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">JetSeater</a>
+                </div>
+                <ul class="nav navbar-nav">
+                    <li ng-class="{active: isActive('navSelect')}" ng-click="navSelect()"><a href="">Query SLF</a></li>
+                    <li ng-class="{active: isActive('navInsert')}" ng-click="navInsert()"><a href="">Input SLF</a></li>
+                    <!-- <li id="navModify"><a href="">Admin SLF</a></li> -->
+                </ul>
+                <ul class="nav navbar-nav navbar-right">
+                    <li><a href="">Development version</a></li>
+                    <li><a href="">{{rowCount()}}</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="container" ng-show="queryControllerVisible()" ng-controller="queryController" ng-cloak>
+            <div class="row">
+                <div class="col-md-8 col-md-offset-2">
+                    <div class="panel panel-info">
+                        <div class="panel-heading"><h3 class="panel-title">Query select</h3></div>
+                        <div class="panel-body text-center">
+                            <select ng-model="querySelect"
+                                    ng-change="queryChange()">
+                                <option value="JS06">Flight specific monthly SLF</option>
+                                <option value="JS08">Flight specific yearly SLF</option>
+                                <option value="JS09">Flight specific SLF</option>
+                                <option value="JS05">Monthly SLF</option>
+                                <option value="JS07">Yearly SLF</option>
+                                <option value="JS03">All SLF</option>
+                            </select>
+                            <select ng-model="yearSelect"
+                                    ng-options="years.D_YEAR as years.D_YEAR for years in yearList"
+                                    ng-show="yearSelectVisible">
+                            </select>
+                            <select ng-model="monthSelect"
+                                    ng-options="months.d_monthVal as months.d_monthName for months in monthList"
+                                    ng-show="monthSelectVisible">
+                            </select>
+                            <select ng-model="flightSelect"
+                                    ng-options="flights.FLT_NO as flights.FLT_NO for flights in flightList"
+                                    ng-show="flightSelectVisible">
+                            </select>
+                            <hr/>
+                            <button type="button" class="btn btn-primary" ng-click="executeQuery()">Execute</button>
+                            <button type="button" class="btn btn-default" ng-click="clearResult()">Clear</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <div class="label label-danger ng-hide" ng-show="errorMessage">Query error. Please reload page.</div>
+                    <div class="label label-warning" ng-show="loadingMessage">Loading...</div>
+
+                    <div class="ng-hide" ng-controller="resultTableController" ng-show="resultTableVisible">
+                        <table class="table table-condensed">
+                            <thead>
+                                <tr>
+                                    <th>Dep date</th>
+                                    <th>Flight no</th>
+                                    <th>Stretch</th>
+                                    <th>Acft type</th>
+                                    <th class="text-right">C</th>
+                                    <th class="text-right">Y</th>
+                                    <th class="text-right">Total</th>
+                                    <th class="text-right">SLF C</th>
+                                    <th class="text-right">SLF Y</th>
+                                    <th class="text-right">SLF total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr ng-repeat="item in data">
+                                    <td>{{parseDate(item.DEP_DATE)}}</td>
+                                    <td>{{item.FLT_NO}}</td>
+                                    <td>{{item.STRETCH}}</td>
+                                    <td>{{item.ACFT_TYPE}}</td>
+                                    <td class="text-right">{{item.C}}</td>
+                                    <td class="text-right">{{item.Y}}</td>
+                                    <td class="text-right">{{item.TOTAL}}</td>
+                                    <td class="text-right">{{item.SLF_C}}%</td>
+                                    <td class="text-right">{{item.SLF_Y}}%</td>
+                                    <td class="text-right">{{item.SLF_TOTAL}}%</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th></th>
+                                    <th></th>
+                                    <th></th>
+                                    <th>Average</th>
+                                    <th class="text-right">{{means.C}}</th>
+                                    <th class="text-right">{{means.Y}}</th>
+                                    <th class="text-right">{{means.TOTAL}}</th>
+                                    <th class="text-right">{{means.SLF_C}}%</th>
+                                    <th class="text-right">{{means.SLF_Y}}%</th>
+                                    <th class="text-right">{{means.SLF_TOTAL}}%</th>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p><small>{{resultSize}}</small></p>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1" style="float: none; margin: 0 auto;">
+                    <div id="morrisChartDiv" style="width: 800px; height: 400px; display: none"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="container ng-hide" ng-show="inputControllerVisible()" ng-controller="inputController" ng-cloak>
+            <div class="row">
+                <div class="col-md-8 col-md-offset-2">
+                    <div class="panel panel-success">
+                        <div class="panel-heading" ng-click="hide_this=!hide_this">
+                            <h3 class="panel-title" ng-hide="hide_this">Input SLF</h3>
+                        </div>
+                        <div class="panel-body text-center">
+                            <form class="form-inline" role="form">
+                                <div class="row">
+                                    <input class="form-control" type="text" ng-model="inputDate" jqdatepicker placeholder="Flight date"/>
+                                    <select class="form-control" ng-model="inputFlt">
+                                        <option value="FLT001">FLT001</option>
+                                        <option value="FLT002">FLT002</option>
+                                    </select>
+                                    <select class="form-control" ng-model="inputStretch">
+                                        <option value="SYD-CGK">SYD-CGK</option>
+                                        <option value="SYD-DPS">SYD-DPS</option>
+                                    </select>
+                                </div>
+                                <div class="row">
+                                    <select class="form-control" ng-model="inputAcft">
+                                        <option value="A332">A332</option>
+                                    </select>
+                                    <input class="form-control" type="number" ng-model="inputC" placeholder="C"/>
+                                    <input class="form-control" type="number" ng-model="inputY" placeholder="Y"/>
+                                </div>
+                                <div class="row">
+                                    <button type="submit" class="btn btn-success" ng-click="inputInsert()">Enter</button>
+                                </div>
+                                <div class="row">
+                                    <div ng-show="inputSuccess" class="alert alert-success alert-dismissible" role="alert" ng-init="inputSuccess=false" ng-click="inputSuccess=false">Input successful</div>
+                                    <div ng-show="inputFailure" class="alert alert-danger alert-dismissible" role="alert" ng-init="inputFailure=false" ng-click="inputFailure=false">Input failed: {{failMessage}}</div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div id="inputPreview">
+                            <pre>
+                                 Date: {{inputDate}}
+                                  Flt: {{inputFlt}}
+                              Stretch: {{inputStretch}}
+                                 Acft: {{inputAcft}}
+                                    C: {{inputC}}
+                                    Y: {{inputY}}
+                                Total: {{inputTotal = inputC + inputY}}
+                                SLF C: {{inputSLFC = (inputC/36*100 | number: 2)}} %
+                                SLF Y: {{inputSLFY = (inputY/186*100 | number: 2)}} %
+                            SLF Total: {{inputSLFTotal = (inputTotal/222*100 | number: 2)}} %
+                            </pre>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container" id="adminSLF" style="display: none" ng-cloak>
+            <div class="row">
+                <div class="col-md-8 col-md-offset-2">
+                    <div class="panel panel-danger">
+                        <div class="panel-heading"><h3 class="panel-title">Admin SLF</h3></div>
+                        <div class="panel-body text-center">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<script type="text/javascript">
+
+var JetSeater = angular.module("JetSeater", []);
+
+JetSeater.service("activePage", function($http) {
+    var page = "navSelect";
+    var rowCount = 0;
+    return {
+        getPage: function() {
+            return page;
+        },
+        setPage: function(value) {
+            page = value;
+        },
+        getRowCount: function() {
+            return rowCount;
+        },
+        setRowCount: function() {
+            $http.get("/JetSeater", {
+                params: { q: "JS000" }
+            }).success( function(json) {
+                rowCount = Number(json.data[0].ROWCOUNT).toLocaleString() + " rows in database";
+            });
+        }
+    };
+});
+
+JetSeater.directive('jqdatepicker', function () {
+    return {
+        restrict: 'A',
+        require: 'ngModel',
+        link: function ($scope, $element, $attrs, $ngModelCtrl) {
+            $element.datepicker({
+                dateFormat: 'yy-mm-dd',
+                onSelect: function (date) {
+                    $scope.inputDate = date;
+                    $scope.$apply();
+                }
+            });
+        }
+    };
+});
+
+JetSeater.controller("navController", function($scope, $http, activePage) {
+    activePage.setRowCount();
+    $scope.rowCount = function() {
+        return activePage.getRowCount();
+    }
+    $scope.isActive = function(page) {
+        return page == activePage.getPage();
+    };
+    $scope.navSelect = function() {
+        activePage.setPage("navSelect");
+    };
+    $scope.navInsert = function() {
+        activePage.setPage("navInsert");
+    };
+});
+
+JetSeater.controller("queryController", function($scope, $http, activePage) {
+    $scope.loadingMessage = true;
+    $scope.yearList = [];
+    $scope.monthList = [];
+    $scope.flightList = [];
+    $scope.querySelect = "JS06";
+    $scope.yearSelectVisible = false;
+    $scope.monthSelectVisible = true;
+    $scope.flightSelectVisible = true;
+    $http.get("/JetSeater", {
+        params: {q: "JS002"}
+    }).success( function(json) {
+        $scope.yearList = json.data;
+        var years = json.data;
+        for(i=0; i<years.length; i++) {
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-01" , d_monthName: "Jan "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-02" , d_monthName: "Feb "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-03" , d_monthName: "Mar "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-04" , d_monthName: "Apr "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-05" , d_monthName: "May "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-06" , d_monthName: "Jun "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-07" , d_monthName: "Jul "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-08" , d_monthName: "Aug "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-09" , d_monthName: "Sep "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-10" , d_monthName: "Oct "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-11" , d_monthName: "Nov "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthVal: years[i].D_YEAR+"-12" , d_monthName: "Dec "+years[i].D_YEAR } );
+            $scope.monthList.push( { d_monthName: "--------" } );
+        };
+        $scope.yearSelect = years[0].D_YEAR;
+        $scope.monthSelect = $scope.monthList[0].d_monthVal;
+    });
+    $http.get("/JetSeater", {
+        params: {q: "JS001"}
+    }).success( function(json) {
+        $scope.flightList = json.data;
+        $scope.flightSelect = $scope.flightList[0].FLT_NO;
+    });
+    $scope.loadingMessage = false;
+    $scope.queryControllerVisible = function() {
+        return activePage.getPage() == "navSelect";
+    };
+    $scope.queryChange = function() {
+        switch($scope.querySelect) {
+            case "JS07":
+                $scope.yearSelectVisible = true;
+                $scope.monthSelectVisible = false;
+                $scope.flightSelectVisible = false;
+                break;
+            case "JS05":
+                $scope.yearSelectVisible = false;
+                $scope.monthSelectVisible = true;
+                $scope.flightSelectVisible = false;
+                break;
+            case "JS09":
+                $scope.yearSelectVisible = false;
+                $scope.monthSelectVisible = false;
+                $scope.flightSelectVisible = true;
+                break;
+            case "JS08":
+                $scope.yearSelectVisible = true;
+                $scope.monthSelectVisible = false;
+                $scope.flightSelectVisible = true;
+                break;
+            case "JS06":
+                $scope.yearSelectVisible = false;
+                $scope.monthSelectVisible = true;
+                $scope.flightSelectVisible = true;
+                break;
+            case "JS03":
+                $scope.yearSelectVisible = false;
+                $scope.monthSelectVisible = false;
+                $scope.flightSelectVisible = false;
+                break;
+        };
+    };
+    $scope.executeQuery = function() {
+        $scope.resultTableVisible = false;
+        $scope.loadingMessage = true;
+        var queryMonth = $scope.monthSelect.split("-")[1]
+        var queryYear  = $scope.monthSelect.split("-")[0]
+        switch($scope.querySelect) {
+            case "JS07": queryParam = {q: "JS07", p: $scope.yearSelect}; break;
+            case "JS05": queryParam = {q: "JS05", p: [queryYear, queryMonth]}; break;
+            case "JS09": queryParam = {q: "JS09", p: $scope.flightSelect}; break;
+            case "JS08": queryParam = {q: "JS08", p: [$scope.yearSelect, $scope.flightSelect]}; break;
+            case "JS06": queryParam = {q: "JS06", p: [queryYear, queryMonth, $scope.flightSelect]}; break;
+            case "JS03": queryParam = {q: "JS03"}; break;
+        };
+        $http.get("/JetSeater", {
+            params: queryParam
+        }).success(function(json) {
+            $scope.data = json.data;
+            $scope.means = $scope.mean($scope.data);
+            $scope.resultSize = Number(json.rows).toLocaleString() + " rows in " + json.time + " seconds";
+            if(json.rows > 1000) {
+                $scope.resultSize += " (showing 500 rows)";
+            }
+            $scope.resultTableVisible = true;
+            $scope.loadingMessage = false;
+            $scope.errorMessage = false;
+        }).error(function() {
+            $scope.loadingMessage = false;
+            $scope.errorMessage = true;
+        })
+    };
+    $scope.clearResult = function() {
+        $scope.resultTableVisible = false;
+    };
+    $scope.mean = function(data) {
+        var sum_c = 0;
+        var sum_y = 0;
+        var sum_total = 0;
+        var sum_slf_c = 0;
+        var sum_slf_y = 0;
+        var sum_slf_total = 0;
+        for(i=0; i<data.length; i++) {
+            sum_c += Number(data[i].C);
+            sum_y += Number(data[i].Y);
+            sum_total += Number(data[i].TOTAL);
+            sum_slf_c += Number(data[i].SLF_C);
+            sum_slf_y += Number(data[i].SLF_Y);
+            sum_slf_total += Number(data[i].SLF_TOTAL);
+        };
+        return {C: (sum_c / data.length).toFixed(2),
+                Y: (sum_y / data.length).toFixed(2),
+                TOTAL: (sum_total / data.length).toFixed(2),
+                SLF_C: (sum_slf_c / data.length).toFixed(2),
+                SLF_Y: (sum_slf_y / data.length).toFixed(2),
+                SLF_TOTAL: (sum_slf_total / data.length).toFixed(2)};
+    };
+    $scope.parseDate = function(date) {
+        date = date.split("-");
+        switch(date[1]) {
+            case "01": return date[2] + "-Jan-" + date[0];
+            case "02": return date[2] + "-Feb-" + date[0];
+            case "03": return date[2] + "-Mar-" + date[0];
+            case "04": return date[2] + "-Apr-" + date[0];
+            case "05": return date[2] + "-May-" + date[0];
+            case "06": return date[2] + "-Jun-" + date[0];
+            case "07": return date[2] + "-Jul-" + date[0];
+            case "08": return date[2] + "-Aug-" + date[0];
+            case "09": return date[2] + "-Sep-" + date[0];
+            case "10": return date[2] + "-Oct-" + date[0];
+            case "11": return date[2] + "-Nov-" + date[0];
+            case "12": return date[2] + "-Dec-" + date[0];
+        };
+    };
+});
+
+JetSeater.controller("resultTableController", function($scope) {
+    //
+});
+
+JetSeater.controller("inputController", function($scope, $http, $filter, activePage) {
+    $scope.inputControllerVisible = function() {
+            return activePage.getPage() == "navInsert";
+    };
+    $scope.inputInsert = function() {
+        var inputDate = $scope.inputDate.split("-");
+        var inputYear = inputDate[0];
+        var inputMonth = inputDate[1];
+        var inputTgl = inputDate[2];
+        var inputData = [ $scope.inputDate, $scope.inputFlt, $scope.inputStretch, $scope.inputAcft, 
+                          $scope.inputC, $scope.inputY, $scope.inputTotal, 
+                          $scope.inputSLFC, $scope.inputSLFY, $scope.inputSLFTotal,
+                          inputYear, inputMonth, inputTgl ];
+        var inputParam = ["q=JS90"];
+        // inputParam.push("p=DEP_DATE&p=FLT_NO&p=STRETCH&p=ACFT_TYPE&p=C&p=Y&p=TOTAL&p=SLF_C&p=SLF_Y&p=SLF_TOTAL&p=D_YEAR&p=D_MONTH&p=D_DATE");
+
+        for(i=0; i<inputData.length; i++) {
+            inputParam.push("p=" + inputData[i]);
+        }
+        inputParam = inputParam.join("&");
+        $http({
+            method: "POST",
+            url: "/JetSeater",
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            data: inputParam
+        }).success(function(json) {
+            $scope.inputSuccess = false;
+            $scope.inputFailure = false;
+            if(json.status == "success") {
+                $scope.inputSuccess = true;
+                $scope.inputFailure = false;
+                activePage.setRowCount();
+            } else {
+                $scope.failMessage = json.status;
+                $scope.inputFailure = true;
+                $scope.inputSuccess = false;
+            }
+        })
+        return;
+    };
+});
+
+</script>
+
+    </body>
+</html>

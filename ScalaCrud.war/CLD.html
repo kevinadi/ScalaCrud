@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>CLD</title>
+  <style type="text/css">
+    .table {font-size: 12px;}
+    .pointer {cursor: pointer;}
+  </style>
+</head>
+
+<body ng-app="jdbcServlet" ng-cloak>
+
+  <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css"/>
+  <script type="text/javascript" src="js/angular.js"></script>
+  <script type="text/javascript" src="js/ui-bootstrap-tpls-0.11.2.min.js"></script>
+
+  <div class="container">
+
+    <div ng-controller="tableController">
+      <p><a href="/">Home</a></p>
+      <p><div id="currTime">{{currTime}}</div></p>
+      <p>
+        From <select ng-model="dateSelect1" ng-options="d.DATE as d.DATE for d in dateList | filter: dateFilterLT('DATE', dateSelect2) "></select>
+        To <select ng-model="dateSelect2" ng-options="d.DATE as d.DATE for d in dateList | filter: dateFilterGT('DATE', dateSelect1)"></select>
+        <button type="button" ng-disabled="executeDisable" ng-click="executeQuery()">Execute</button>
+        Filter: <input type="text" ng-model="filterText"/>
+        <button type="button" ng-click="filterText = ''">Clear</button>
+      </p>
+
+      <div ng-show="tableEntryExit" class="table-responsive">
+        <hr/>
+        <table class="table table-condensed">
+          <thead>
+            <th>No</th>
+            <th>Tracking id</th>
+            <th>Name</th>
+            <th>Funder</th>
+            <th>Status</th>
+          </thead>
+          <tbody>
+            <tr ng-repeat="row in entryexit.data | filter: filterText" ng-class="row.STATUS=='EXIT' ? 'danger' : 'success'">
+              <td>{{$index+1}}</td>
+              <td class="pointer" ng-click="filterUpdate(row.TRACKING_ID)">{{row.TRACKING_ID}}</td>
+              <td class="pointer" ng-click="filterUpdate(row.NAME)">{{row.NAME}}</td>
+              <td class="pointer" ng-click="filterUpdate(row.FUNDER)">{{row.FUNDER}}</td>
+              <td>{{row.STATUS}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p ng-show="tableLoadMsg">Loading...</p>
+      <div ng-show="!tableLoadMsg" class="table-responsive">
+        <hr/>
+        <table class="table table-condensed">
+          <thead>
+            <th>No</th>
+            <th>Tracking id</th>
+            <th>Name</th>
+            <th>Funder</th>
+            <th>Date</th>
+            <th>Broker</th>
+            <th style="text-align:right">Loan balance</th>
+            <th style="text-align:right">Payment</th>
+            <th style="text-align:right">Total pay</th>
+          </thead>
+          <tbody>
+          <tr ng-repeat="row in trail.data | filter: filterText | limitTo: 500" repeat-done="finishRender()" ng-class="{'active' : row.DATE.split('-')[1]%2==0}">
+            <td>{{$index+1}}</td>
+            <td class="pointer" ng-click="filterUpdate(row.TRACKING_ID)">{{row.TRACKING_ID}}</td>
+            <td class="pointer" ng-click="filterUpdate(row.NAME)">{{row.NAME}}</td>
+            <td class="pointer" ng-click="filterUpdate(row.FUNDER)">{{row.FUNDER}}</td>
+            <td class="pointer" ng-click="filterUpdate(row.DATE)">{{row.DATE | date: 'MMM yyyy'}}</td>
+            <td class="pointer" ng-click="filterUpdate(row.BROKER)">{{row.BROKER}}</td>
+            <td style="text-align:right">{{row.LOAN_BALANCE | currency}}</td>
+            <td style="text-align:right">{{row.PAYMENT | currency}}</td>
+            <td style="text-align:right">{{row.TOTAL_PAY | currency}}</td>
+          </tr>
+          </tbody>
+        </table>
+        <p>{{queryStat}}</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="text/javascript" src="js/properPOST.js"></script>
+  <script>
+
+var jdbcServlet = angular.module("jdbcServlet", ["ui.bootstrap", "properPOST"]);
+
+jdbcServlet.controller("tableController", ["$scope", "$http", function($scope, $http) {
+  $scope.tableLoadMsg = true;
+  $scope.tableEntryExit = false;
+  $scope.currTime = Date();
+
+  $http({
+    url: "/CLD",
+    method: "GET",
+    params: {q: "CLD03"}
+  }).success(function(json) {
+    $scope.dateList = json.data;
+    $scope.dateSelect1 = json.data[1].DATE;
+    $scope.dateSelect2 = json.data[0].DATE;
+    $scope.queryEntryExit($scope.dateSelect1, $scope.dateSelect2);
+    $scope.queryTrail($scope.dateSelect1, $scope.dateSelect2);
+  });
+
+  $scope.queryEntryExit = function(date1, date2) {
+    $scope.tableEntryExit = false;
+    $http({
+      url: "/CLD",
+      method: "GET",
+      params: {q: "CLD05", p: [date1, date2, date2, date1]}
+    }).success(function(json) {
+      $scope.entryexit = json;
+      if(json.rows > 0) $scope.tableEntryExit = true;
+    });
+  };
+
+  $scope.queryTrail = function(date1, date2) {
+    $scope.tableLoadMsg = true;
+    $http({
+      url: "/CLD",
+      method: "GET",
+      params: {q: "CLD04", p: [date1, date2]}
+    }).success(function(json) {
+      $scope.trail = json;
+      $scope.queryStat = json.rows + " rows in " + json.time + "s";
+      if(json.rows > 500) $scope.queryStat += " (displaying 500 rows)";
+    });
+  };
+  
+  $scope.finishRender = function() {
+    $scope.tableLoadMsg = false;
+    $scope.executeDisable = false;
+  };
+
+  $scope.executeQuery = function() {
+    $scope.executeDisable = true;
+    $scope.tableLoadMsg = true;
+    $scope.queryEntryExit($scope.dateSelect1, $scope.dateSelect2);
+    $scope.queryTrail($scope.dateSelect1, $scope.dateSelect2);
+  };
+
+  $scope.dateFilterLT = function(prop, val) {
+    return function(item) {
+      if(item[prop] <= val) return true;
+    };
+  };
+  $scope.dateFilterGT = function(prop, val) {
+    return function(item) {
+      if(item[prop] >= val) return true;
+    };
+  };
+
+  $scope.filterUpdate = function(text) {
+    $scope.filterText = text;
+  }
+}]);
+
+jdbcServlet.directive("repeatDone", function() {
+  return function($scope, element, attrs) {
+      if ($scope.$last) { // all are rendered
+        $scope.$eval(attrs.repeatDone);
+      }
+    }
+  });
+
+  </script>
+</body>
+</html>
