@@ -1,3 +1,8 @@
-*.trace.*
-CLD.mv.db
-GFD.mv.db
+/RUNNING_PID
+/logs/
+/project/*-shim.sbt
+/project/project/
+/project/target/
+/target/
+*.trace.db
+*.mv.db

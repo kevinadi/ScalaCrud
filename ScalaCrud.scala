@@ -1,7 +1,5 @@
 // package kevinadi
 
-jdbcJetty.main(Array())
-
 object queryCode {
 
     import annotation.tailrec
@@ -137,7 +135,7 @@ object queryCode {
     }
 
     private def insertCLD(db: Jdbc, sql: String, params: Array[String]): String = {
-        import au.com.bytecode.opencsv.{CSVParser, CSVReader}
+        // import au.com.bytecode.opencsv.{CSVParser, CSVReader}
         return "CLD insert not implemented"
     }
 
@@ -225,7 +223,6 @@ object jdbcJetty {
 class JdbcServlet(servletName: String) extends javax.servlet.http.HttpServlet {
 
     import javax.servlet.http.{HttpServletRequest, HttpServletResponse}
-    import com.twitter.json.Json
 
     val db = new Jdbc("org.h2.Driver", "jdbc:h2:./" + servletName + ";AUTO_SERVER=TRUE", "sa", "")
 
